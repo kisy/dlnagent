@@ -95,26 +95,55 @@
         container.querySelector('#cast-btn').onclick = castVideo;
     }
 
+    // Show Error function
+    function showError(msg) {
+        const container = document.getElementById(containerId);
+        const urlDiv = container.querySelector('.url');
+        const originalContent = urlDiv.getAttribute('data-original-content') || urlDiv.innerHTML;
+        
+        // Save original content if not already saved
+        if (!urlDiv.getAttribute('data-original-content')) {
+            urlDiv.setAttribute('data-original-content', originalContent);
+        }
+
+        urlDiv.innerHTML = `<span style="color: #ff6b6b">Error: ${msg}</span> <span class="error-close" style="cursor:pointer; color: #aaa; margin-left: 5px;">[x]</span>`;
+        
+        urlDiv.querySelector('.error-close').onclick = () => {
+            urlDiv.innerHTML = originalContent;
+        };
+    }
+
     // Copy function
     function copyLink() {
         if (!detectedUrl) return;
+        const btn = document.getElementById('copy-btn');
+        
+        // Check if in result state (based on custom attribute)
+        if (btn.getAttribute('data-state') === 'result') {
+            btn.textContent = 'Copy';
+            btn.style.background = ''; // Revert to CSS default
+            btn.removeAttribute('data-state');
+            // Continue to re-execute copy
+        }
+
+        const setSuccess = () => {
+            btn.textContent = 'Copied!';
+            btn.style.background = '#4CAF50'; // Green
+            btn.setAttribute('data-state', 'result');
+        };
+
+        const setFailure = (msg) => {
+            btn.textContent = 'Failed';
+            btn.style.background = '#F44336'; // Red
+            btn.setAttribute('data-state', 'result');
+            showError(msg || 'Copy failed');
+        };
+
         navigator.clipboard.writeText(detectedUrl).then(() => {
-            alert('Link copied to clipboard!');
+            setSuccess();
         }).catch(err => {
             console.error('Failed to copy: ', err);
-            // Fallback for some environments if navigator.clipboard fails
-            const textArea = document.createElement("textarea");
-            textArea.value = detectedUrl;
-            document.body.appendChild(textArea);
-            textArea.select();
-            try {
-                document.execCommand('copy');
-                alert('Link copied to clipboard!');
-            } catch (err) {
-                console.error('Fallback copy failed', err);
-                alert('Failed to copy link');
-            }
-            document.body.removeChild(textArea);
+            setFailure('Copy failed: ' + err);
         });
     }
 
@@ -133,6 +162,20 @@
     function castVideo() {
         if (!detectedUrl) return;
 
+        const btn = document.getElementById('cast-btn');
+        
+        // Check if in result state
+        if (btn.getAttribute('data-state') === 'result') {
+            btn.textContent = 'Cast to DLNA';
+            btn.style.background = ''; // Revert to CSS default
+            btn.disabled = false;
+            btn.removeAttribute('data-state');
+            // Continue to re-execute cast
+        }
+
+        btn.textContent = 'Casting...';
+        btn.disabled = true;
+
         GM_xmlhttpRequest({
             method: "POST",
             url: CAST_API_URL,
@@ -145,15 +188,25 @@
             }),
             onload: function(response) {
                 console.log("Cast response:", response.responseText);
+                btn.disabled = false; // Enable to allow click-to-restore
+                btn.setAttribute('data-state', 'result');
+                
                 if (response.status === 200) {
-                    alert('Casting started!');
+                    btn.textContent = 'Casting Started!';
+                    btn.style.background = '#2E7D32'; // Dark Green
                 } else {
-                    alert('Failed to cast: ' + response.responseText);
+                    btn.textContent = 'Failed';
+                    btn.style.background = '#F44336'; // Red
+                    showError('Status ' + response.status + ': ' + response.responseText);
                 }
             },
             onerror: function(err) {
                 console.error("Cast error:", err);
-                alert('Error connecting to DLNA service');
+                btn.disabled = false;
+                btn.setAttribute('data-state', 'result');
+                btn.textContent = 'Error';
+                btn.style.background = '#F44336'; // Red
+                showError('Connection error');
             }
         });
     }
