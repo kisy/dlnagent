@@ -140,7 +140,8 @@
                 "Content-Type": "application/json"
             },
             data: JSON.stringify({
-                url: detectedUrl
+                url: detectedUrl,
+                title: document.title || "Unknown Title"
             }),
             onload: function(response) {
                 console.log("Cast response:", response.responseText);

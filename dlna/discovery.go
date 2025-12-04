@@ -25,25 +25,100 @@ const (
 )
 
 type DiscoveryService struct {
-	devices    map[string]*Device
-	lastLogged map[string]time.Time
-	mu         sync.RWMutex
-	ifaceName  string
-	interval   time.Duration
+	devices       map[string]*Device
+	lastLogged    map[string]time.Time
+	mu            sync.RWMutex
+	ifaceName     string
+	interval      time.Duration
+	scanDuration  time.Duration
+	candidateChan chan *candidate
+	resultChan    chan *Device
+}
+
+type candidate struct {
+	usn      string
+	location string
 }
 
 func NewDiscoveryService(ifaceName string, interval time.Duration) *DiscoveryService {
 	return &DiscoveryService{
-		devices:    make(map[string]*Device),
-		lastLogged: make(map[string]time.Time),
-		ifaceName:  ifaceName,
-		interval:   interval,
+		devices:       make(map[string]*Device),
+		lastLogged:    make(map[string]time.Time),
+		ifaceName:     ifaceName,
+		interval:      interval,
+		scanDuration:  3 * time.Second,
+		candidateChan: make(chan *candidate, 10),
+		resultChan:    make(chan *Device, 10),
 	}
 }
 
 func (s *DiscoveryService) Start() {
 	go s.listenMulticast()
-	go s.sendSearch()
+	go s.runLoop()
+}
+
+func (s *DiscoveryService) runLoop() {
+	for {
+		// 1. Start Round
+		roundFound := make(map[string]bool)
+		var roundNew []*Device
+
+		// 2. Trigger Search
+		go s.sendSearch()
+
+		// 3. Collect Phase
+		timeout := time.After(s.scanDuration)
+	collectLoop:
+		for {
+			select {
+			case cand := <-s.candidateChan:
+				if roundFound[cand.usn] {
+					continue
+				}
+				roundFound[cand.usn] = true
+
+				s.mu.RLock()
+				_, exists := s.devices[cand.usn]
+				s.mu.RUnlock()
+
+				if exists {
+					// Cache has skip
+					continue
+				}
+
+				// Not exist add
+				go s.fetchDescription(cand.usn, cand.location)
+
+			case dev := <-s.resultChan:
+				if dev != nil {
+					roundNew = append(roundNew, dev)
+					roundFound[dev.USN] = true
+				}
+
+			case <-timeout:
+				break collectLoop
+			}
+		}
+
+		// 4. Sync Phase
+		s.mu.Lock()
+		// Delete missing
+		for usn := range s.devices {
+			if !roundFound[usn] {
+				delete(s.devices, usn)
+				log.Printf("Device removed: %s", usn)
+			}
+		}
+		// Add new
+		for _, dev := range roundNew {
+			s.devices[dev.USN] = dev
+			log.Printf("Device added: %s (%s)", dev.FriendlyName, dev.Location)
+		}
+		s.mu.Unlock()
+
+		// 5. Sleep
+		time.Sleep(s.interval)
+	}
 }
 
 // sendSearch sends a single burst of M-SEARCH packets
@@ -183,29 +258,18 @@ func (s *DiscoveryService) handleHeaders(header http.Header, src net.Addr) {
 	}
 
 	// Extract UUID from USN
-	// Format is usually uuid:device-UUID::... or just uuid:device-UUID
 	uuid := strings.Split(usn, "::")[0]
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if _, exists := s.devices[uuid]; !exists {
-		log.Printf("Found potential device: %s at %s (from %v)", uuid, location, src)
-		// New device, fetch description
-		go s.fetchDescription(uuid, location)
-	} else {
-		// Update last seen
-		s.devices[uuid].LastSeen = time.Now()
-		// Update location if changed (sometimes devices change ports)
-		if s.devices[uuid].Location != location {
-			s.devices[uuid].Location = location
-			// Optionally re-fetch description if location changed
-		}
+	// Send to candidate channel
+	select {
+	case s.candidateChan <- &candidate{usn: uuid, location: location}:
+	default:
+		// Drop if channel full to avoid blocking listener
 	}
 }
 
 func (s *DiscoveryService) fetchDescription(uuid, location string) {
-	log.Printf("Fetching description from %s for UUID %s", location, uuid)
+	// log.Printf("Fetching description from %s for UUID %s", location, uuid)
 	resp, err := http.Get(location)
 	if err != nil {
 		log.Printf("Error fetching description from %s: %v", location, err)
@@ -225,25 +289,15 @@ func (s *DiscoveryService) fetchDescription(uuid, location string) {
 		} `xml:"device"`
 	}
 
-	// Read body for debugging (optional, but helpful if XML is malformed)
-	// bodyBytes, _ := io.ReadAll(resp.Body)
-	// log.Printf("XML Content: %s", string(bodyBytes))
-	// resp.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-
 	if err := xml.NewDecoder(resp.Body).Decode(&desc); err != nil {
 		log.Printf("Error decoding description XML from %s: %v", location, err)
 		return
 	}
 
-	log.Printf("Parsed device: %s", desc.Device.FriendlyName)
-
 	controlURL := ""
 	for _, svc := range desc.Device.ServiceList.Service {
-		// log.Printf("Found service: %s", svc.ServiceType)
 		if strings.Contains(svc.ServiceType, "AVTransport") {
 			controlURL = svc.ControlURL
-			// Don't break yet, maybe we want to log all services
-			// break
 		}
 	}
 
@@ -254,14 +308,11 @@ func (s *DiscoveryService) fetchDescription(uuid, location string) {
 
 	// Handle relative ControlURL
 	if !strings.HasPrefix(controlURL, "http") {
-		// Simple join, might need more robust URL handling
 		baseURL := location
 		if lastSlash := strings.LastIndex(location, "/"); lastSlash != -1 {
 			baseURL = location[:lastSlash]
 		}
-		// If controlURL starts with /, use host from location
 		if strings.HasPrefix(controlURL, "/") {
-			// Extract host
 			if u, err := http.NewRequest("GET", location, nil); err == nil {
 				controlURL = fmt.Sprintf("%s://%s%s", u.URL.Scheme, u.URL.Host, controlURL)
 			}
@@ -270,16 +321,19 @@ func (s *DiscoveryService) fetchDescription(uuid, location string) {
 		}
 	}
 
-	s.mu.Lock()
-	s.devices[uuid] = &Device{
-		USN:          uuid, // Store UUID as USN identifier
+	dev := &Device{
+		USN:          uuid,
 		Location:     location,
 		FriendlyName: desc.Device.FriendlyName,
 		LastSeen:     time.Now(),
 		ControlURL:   controlURL,
 	}
-	s.mu.Unlock()
-	log.Printf("Discovered device: %s (%s)", desc.Device.FriendlyName, location)
+
+	select {
+	case s.resultChan <- dev:
+	case <-time.After(1 * time.Second):
+		log.Printf("Timeout sending device result for %s", uuid)
+	}
 }
 
 func (s *DiscoveryService) GetDevices() []*Device {

@@ -48,8 +48,9 @@ func (h *Handler) SetDefaultDeviceHandler(w http.ResponseWriter, r *http.Request
 
 func (h *Handler) CastHandler(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		URL string `json:"url"`
-		USN string `json:"usn"` // Optional
+		URL   string `json:"url"`
+		USN   string `json:"usn"`   // Optional
+		Title string `json:"title"` // Optional
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -88,7 +89,7 @@ func (h *Handler) CastHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := dlna.Play(device.ControlURL, req.URL); err != nil {
+	if err := dlna.Play(device.ControlURL, req.URL, req.Title); err != nil {
 		http.Error(w, fmt.Sprintf("Failed to cast: %v", err), http.StatusInternalServerError)
 		return
 	}
