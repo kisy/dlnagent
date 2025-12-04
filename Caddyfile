@@ -1,0 +1,19 @@
+https://172.16.1.5 {
+    reverse_proxy 127.0.0.1:8072 {
+        header_up Host {http.request.host}
+    }
+
+    header {
+        Access-Control-Allow-Origin "*"
+        Access-Control-Allow-Credentials "true"
+        Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+        Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+        Access-Control-Max-Age "100"
+        Vary "Origin"
+    }
+
+    @options method OPTIONS
+    respond @options 204
+
+    encode gzip zstd
+}
