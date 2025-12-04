@@ -4,6 +4,7 @@ import (
 	"dlna/dlna"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -93,6 +94,8 @@ func (h *Handler) CastHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Failed to cast: %v", err), http.StatusInternalServerError)
 		return
 	}
+
+	log.Printf("Casting to %s: URL=%s, Title=%s", device.FriendlyName, req.URL, req.Title)
 
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "Casting to %s", device.FriendlyName)

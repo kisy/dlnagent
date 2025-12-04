@@ -232,20 +232,6 @@ func (s *DiscoveryService) processPacket(data []byte, src net.Addr) {
 		header = req.Header
 	}
 
-	usn := header.Get("USN")
-	if usn != "" {
-		// Extract UUID for logging deduplication
-		uuid := strings.Split(usn, "::")[0]
-		s.mu.Lock()
-		last, ok := s.lastLogged[uuid]
-		shouldLog := !ok || time.Since(last) > 30*time.Second
-		if shouldLog {
-			log.Printf("Received packet from %v:\n%s", src, string(data))
-			s.lastLogged[uuid] = time.Now()
-		}
-		s.mu.Unlock()
-	}
-
 	s.handleHeaders(header, src)
 }
 
