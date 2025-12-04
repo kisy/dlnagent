@@ -232,10 +232,10 @@ func (s *DiscoveryService) processPacket(data []byte, src net.Addr) {
 		header = req.Header
 	}
 
-	s.handleHeaders(header, src)
+	s.handleHeaders(header)
 }
 
-func (s *DiscoveryService) handleHeaders(header http.Header, src net.Addr) {
+func (s *DiscoveryService) handleHeaders(header http.Header) {
 	usn := header.Get("USN")
 	location := header.Get("Location")
 
