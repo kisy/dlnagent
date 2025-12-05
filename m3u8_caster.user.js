@@ -14,6 +14,8 @@
 
     let detectedUrls = [];
     let currentIndex = 0;
+    let isManuallyClosed = false;
+    let scanIntervalId = null;
     const containerId = 'm3u8-caster-container';
     const CAST_API_URL = 'https://172.16.1.5/api/cast';
     const DEVICES_API_URL = 'https://172.16.1.5/api/devices';
@@ -48,6 +50,7 @@
         }
         #${containerId} select {
             flex-grow: 1;
+            height: 34px;
             padding: 8px;
             background: #333;
             color: white;
@@ -120,10 +123,10 @@
                 <select id="device-list">
                     <option value="">Loading devices...</option>
                 </select>
-                <button id="refresh-btn" style="background: #2196F3; font-size: 12px; padding: 8px; height: 34px;">&#x21bb;</button>
+                <button id="refresh-btn" style="background: #2196F3; font-size: 12px; padding: 8px; height: 34px; margin:0;">&#x21bb;</button>
             </div>
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <button id="close-btn" style="background: #666; margin-right: 0;">Close</button>
+                <button id="close-btn" style="background: #666; margin-right: 0;">X</button>
                 <div>
                     <button id="copy-btn" class="copy-btn">Copy</button>
                     <button id="cast-btn" style="margin-right: 0;">Cast to DLNA</button>
@@ -137,6 +140,8 @@
 
         container.querySelector('#close-btn').onclick = () => {
             container.style.display = 'none';
+            isManuallyClosed = true;
+            if (scanIntervalId) clearInterval(scanIntervalId);
         };
 
         container.querySelector('#copy-btn').onclick = copyLink;
@@ -397,6 +402,7 @@
     // Intercept Fetch
     const originalFetch = window.fetch;
     window.fetch = async function(...args) {
+        if (isManuallyClosed) return originalFetch.apply(this, args);
         const [resource, config] = args;
         if (typeof resource === 'string' && resource.includes('.m3u8')) {
             console.log('M3U8 detected via fetch:', resource);
@@ -408,6 +414,7 @@
     // Intercept XHR
     const originalOpen = XMLHttpRequest.prototype.open;
     XMLHttpRequest.prototype.open = function(method, url) {
+        if (isManuallyClosed) return originalOpen.apply(this, arguments);
         if (typeof url === 'string' && url.includes('.m3u8')) {
             console.log('M3U8 detected via XHR:', url);
             showUI(url, 'network');
@@ -416,7 +423,8 @@
     };
 
     // Scan for video tags periodically
-    setInterval(() => {
+    scanIntervalId = setInterval(() => {
+        if (isManuallyClosed) return;
         const videos = document.getElementsByTagName('video');
         for (let video of videos) {
             if (video.src && video.src.includes('.m3u8')) {
