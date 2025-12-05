@@ -39,6 +39,7 @@ The service will start on port 8072 (default).
   - **Note**: Loopback addresses (127.0.0.1, ::1) are automatically excluded from discovery.
 - `-s`: SSDP search interval in seconds (default `10`)
 - `-p`: Default player pattern (matches USN or FriendlyName). Used if no device is specified and no default is set.
+- `-t`: Enable log timestamps (default `false`)
 
 ### 2. Userscript
 

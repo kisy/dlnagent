@@ -10,13 +10,16 @@ import (
 )
 
 func main() {
-	log.SetFlags(0)
-
 	addr := flag.String("h", ":8072", "HTTP server address")
 	udpIP := flag.String("u", "0.0.0.0", "UDP IP to bind to (default: 0.0.0.0)")
 	seconds := flag.Int("s", 10, "SSDP search interval in seconds")
 	player := flag.String("p", "UnPlay", "Default player pattern (USN or FriendlyName match)")
+	showTime := flag.Bool("t", false, "Enable log timestamps")
 	flag.Parse()
+
+	if !*showTime {
+		log.SetFlags(0)
+	}
 
 	discovery := dlna.NewDiscoveryService(*udpIP, time.Duration(*seconds)*time.Second)
 	discovery.Start()
