@@ -74,14 +74,6 @@
         #${containerId} button.copy-btn:hover {
             background: #0b7dda;
         }
-        #${containerId} .close {
-            position: absolute;
-            top: 5px;
-            right: 5px;
-            cursor: pointer;
-            color: #aaa;
-            font-size: 16px;
-        }
         @media (max-width: 600px) {
             #${containerId} {
                 left: 10px;
@@ -109,12 +101,6 @@
                 padding: 8px 15px !important;
                 font-size: 16px !important;
             }
-            #${containerId} .close {
-                padding: 10px;
-                font-size: 24px;
-                top: 0;
-                right: 0;
-            }
         }
     `);
 
@@ -125,8 +111,6 @@
         const container = document.createElement('div');
         container.id = containerId;
         container.innerHTML = `
-            <div class="close">&times;</div>
-            <div class="close">&times;</div>
             <div class="url-container" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
                 <button id="prev-btn" style="background: #555; padding: 4px 8px; font-size: 12px; display: none;">&lt;</button>
                 <div class="url" style="margin: 0 5px; flex-grow: 1; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></div>
@@ -138,15 +122,20 @@
                 </select>
                 <button id="refresh-btn" style="background: #2196F3; font-size: 12px; padding: 8px; height: 34px;">&#x21bb;</button>
             </div>
-            <button id="copy-btn" class="copy-btn">Copy</button>
-            <button id="cast-btn">Cast to DLNA</button>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <button id="close-btn" style="background: #666; margin-right: 0;">Close</button>
+                <div>
+                    <button id="copy-btn" class="copy-btn">Copy</button>
+                    <button id="cast-btn" style="margin-right: 0;">Cast to DLNA</button>
+                </div>
+            </div>
         `;
         document.body.appendChild(container);
 
         // Fetch devices immediately
         fetchDevices();
 
-        container.querySelector('.close').onclick = () => {
+        container.querySelector('#close-btn').onclick = () => {
             container.style.display = 'none';
         };
 
