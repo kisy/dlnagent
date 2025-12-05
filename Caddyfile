@@ -5,9 +5,8 @@ https://172.16.1.5 {
 
     header {
         Access-Control-Allow-Origin "*"
-        Access-Control-Allow-Credentials "true"
-        Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-        Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+        Access-Control-Allow-Methods "GET, POST, OPTIONS"
+        Access-Control-Allow-Headers "Content-Type"
         Access-Control-Max-Age "100"
         Vary "Origin"
     }

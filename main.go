@@ -10,6 +10,8 @@ import (
 )
 
 func main() {
+	log.SetFlags(0)
+
 	addr := flag.String("h", ":8072", "HTTP server address")
 	udpIP := flag.String("u", "0.0.0.0", "UDP IP to bind to (default: 0.0.0.0)")
 	seconds := flag.Int("s", 10, "SSDP search interval in seconds")
