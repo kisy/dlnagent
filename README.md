@@ -24,14 +24,19 @@ Build the binary:
 
 Run the service (example for Linux AMD64):
 
+````bash
 ```bash
-./dlnagent-linux-amd64 -h :8072 -i eth0 -s 10 -p "Living Room"
-```
+./dlnagent-linux-amd64 -h :8072 -u 192.168.1.100 -s 10 -p "Living Room"
+````
 
 The service will start on port 8072 (default).
 
 - `-h`: HTTP server address (default `:8072`)
-- `-i`: Network interface to bind to (e.g., `eth0`)
+- `-u`: UDP IP to bind to (default `0.0.0.0`).
+  - Specify an IPv4 address (e.g., `192.168.1.100`) to listen/send on IPv4 only.
+  - Specify an IPv6 address (e.g., `2001:db8::1`) to listen/send on IPv6 only.
+  - Leave default (`0.0.0.0`) to listen on **both** IPv4 and IPv6 (Dual-stack).
+  - **Note**: Loopback addresses (127.0.0.1, ::1) are automatically excluded from discovery.
 - `-s`: SSDP search interval in seconds (default `10`)
 - `-p`: Default player pattern (matches USN or FriendlyName). Used if no device is specified and no default is set.
 
